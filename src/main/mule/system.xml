@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="8625dd81-b2e3-4900-8084-94305afbedde" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="123456" database="employee" />
+	</db:config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="f493120a-43d4-4470-a82f-436f47401d3a" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<db:config name="Database_Config1" doc:name="Database Config" doc:id="e45bcf00-2376-4406-958d-3d98bc445e9f" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="123456" database="employee" />
+	</db:config>
+	<jms:config name="JMS_Config" doc:name="JMS Config" doc:id="70e329af-93ff-431e-b22c-83f565c0a59b" >
+		<jms:active-mq-connection username="admin" password="admin" >
+			<jms:factory-configuration brokerUrl="tcp://localhost:61616" />
+		</jms:active-mq-connection>
+	</jms:config>
+	<vm:config name="VM_Config" doc:name="VM Config" doc:id="3a7f450c-9a2b-4985-af47-aa5fd5b04948" >
+		<vm:queues >
+			<vm:queue queueName="vm1" queueType="PERSISTENT" />
+		</vm:queues>
+	</vm:config>
+	<flow name="systemFlow" doc:id="edcf6361-5b4b-4ad1-9edb-079e7034b261" >
+		<http:listener doc:name="Listener" doc:id="10b5632c-2e24-4735-804e-d85cb48a26ff" config-ref="HTTP_Listener_config" path="/system">
+			<redelivery-policy messageDigestAlgorithm="SHA-256"/>
+		</http:listener>
+		<db:insert doc:name="Insert" doc:id="0e212033-23bc-4732-b2f4-b104bdc68f7a" config-ref="Database_Config1">
+			<db:sql ><![CDATA[insert into emp values (:id,:firstname,:lastname,:designation,:salary)]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	id: payload.empID,
+	firstname: payload.empFirstName,
+	lastname: payload.empLastName,
+	designation: payload.empDesignation,
+	salary: payload.empSalary
+}]]]></db:input-parameters>
+		</db:insert>
+		<ee:transform doc:name="Transform Message" doc:id="5ffc0d28-983b-49ed-99a8-328127fe3078" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="systemFlow1" doc:id="0c915f1a-1859-4469-9f75-cf5bd239d87f" >
+		<http:listener doc:name="Listener" doc:id="d8a48a30-8e1a-489c-9773-12a0f87db50d" config-ref="HTTP_Listener_config" path="/consume"/>
+		<vm:consume doc:name="Consume" doc:id="09790eef-cd26-4457-a8f9-f67572b1ec7f" config-ref="VM_Config" queueName="vm1" timeout="50"/>
+		<logger level="INFO" doc:name="Logger" doc:id="325b1116-7bb9-438c-85f2-983d55d2c48e" message="#[payload]"/>
+	</flow>
+</mule>
